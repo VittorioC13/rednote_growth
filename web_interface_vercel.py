@@ -33,11 +33,26 @@ HTML_TEMPLATE = """
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
-            background: #0a0a0a;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d1f1f 50%, #3d2626 100%);
             color: #e8e8e8;
             min-height: 100vh;
             padding: 40px 20px;
             line-height: 1.6;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.05) 2px, rgba(0,0,0,.05) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,.05) 2px, rgba(0,0,0,.05) 4px);
+            pointer-events: none;
+            opacity: 0.3;
         }
 
         .container {
@@ -49,7 +64,8 @@ HTML_TEMPLATE = """
             text-align: center;
             margin-bottom: 60px;
             padding: 40px;
-            border-bottom: 1px solid #2a2a2a;
+            border-bottom: 1px solid rgba(205, 92, 92, 0.2);
+            position: relative;
         }
 
         .header h1 {
@@ -57,11 +73,11 @@ HTML_TEMPLATE = """
             font-weight: 300;
             letter-spacing: -1px;
             margin-bottom: 10px;
-            color: #ffffff;
+            color: #f5f5f5;
         }
 
         .header p {
-            color: #999;
+            color: #b8b8b8;
             font-size: 1.1em;
             font-weight: 300;
         }
@@ -73,9 +89,9 @@ HTML_TEMPLATE = """
             font-size: 0.9em;
             font-weight: 300;
             margin-top: 15px;
-            background: #1a1a1a;
-            color: #999;
-            border: 1px solid #2a2a2a;
+            background: rgba(205, 92, 92, 0.1);
+            color: #cd5c5c;
+            border: 1px solid rgba(205, 92, 92, 0.3);
         }
 
         .main-grid {
@@ -92,46 +108,65 @@ HTML_TEMPLATE = """
         }
 
         .card {
-            background: #141414;
-            border: 1px solid #2a2a2a;
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(205, 92, 92, 0.15);
             padding: 40px;
-            transition: border-color 0.3s;
+            transition: all 0.3s;
+            position: relative;
         }
 
         .card:hover {
-            border-color: #3a3a3a;
+            border-color: rgba(205, 92, 92, 0.3);
+            box-shadow: 0 10px 40px rgba(205, 92, 92, 0.05);
         }
 
         .card h2 {
             font-size: 1.5em;
             font-weight: 300;
             margin-bottom: 20px;
-            color: #ffffff;
+            color: #f5f5f5;
         }
 
         .generate-btn {
             width: 100%;
             padding: 20px;
-            background: #ffffff;
-            color: #0a0a0a;
-            border: 1px solid #ffffff;
+            background: linear-gradient(135deg, #cd5c5c 0%, #b84e4e 100%);
+            color: #ffffff;
+            border: 1px solid rgba(205, 92, 92, 0.5);
             font-size: 1.2em;
             font-weight: 400;
             cursor: pointer;
             transition: all 0.3s;
             margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .generate-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .generate-btn:hover::before {
+            left: 100%;
         }
 
         .generate-btn:hover {
-            background: #0a0a0a;
-            color: #ffffff;
-            border: 1px solid #ffffff;
+            background: linear-gradient(135deg, #b84e4e 0%, #a34343 100%);
+            box-shadow: 0 5px 20px rgba(205, 92, 92, 0.3);
         }
 
         .generate-btn:disabled {
-            background: #2a2a2a;
+            background: rgba(40, 40, 40, 0.5);
             color: #666;
-            border: 1px solid #2a2a2a;
+            border: 1px solid rgba(60, 60, 60, 0.5);
             cursor: not-allowed;
         }
 
@@ -147,8 +182,8 @@ HTML_TEMPLATE = """
         }
 
         .spinner {
-            border: 4px solid #2a2a2a;
-            border-top: 4px solid #ffffff;
+            border: 4px solid rgba(40, 40, 40, 0.3);
+            border-top: 4px solid #cd5c5c;
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -164,9 +199,9 @@ HTML_TEMPLATE = """
         .success-message {
             display: none;
             padding: 20px;
-            background: #1a1a1a;
-            color: #ffffff;
-            border: 1px solid #2a2a2a;
+            background: rgba(205, 92, 92, 0.1);
+            color: #cd5c5c;
+            border: 1px solid rgba(205, 92, 92, 0.3);
             margin-bottom: 20px;
             font-weight: 300;
             text-align: center;
@@ -178,14 +213,16 @@ HTML_TEMPLATE = """
 
         .post-item {
             padding: 25px;
-            border: 1px solid #2a2a2a;
+            border: 1px solid rgba(205, 92, 92, 0.15);
             margin-bottom: 20px;
-            background: #1a1a1a;
+            background: rgba(20, 20, 20, 0.4);
+            backdrop-filter: blur(5px);
             transition: all 0.2s;
         }
 
         .post-item:hover {
-            border-color: #3a3a3a;
+            border-color: rgba(205, 92, 92, 0.3);
+            background: rgba(20, 20, 20, 0.6);
         }
 
         .post-number {
@@ -204,9 +241,9 @@ HTML_TEMPLATE = """
         }
 
         .copy-btn {
-            background: #ffffff;
-            color: #0a0a0a;
-            border: 1px solid #ffffff;
+            background: transparent;
+            color: #cd5c5c;
+            border: 1px solid rgba(205, 92, 92, 0.5);
             padding: 10px 20px;
             cursor: pointer;
             font-weight: 400;
@@ -215,19 +252,19 @@ HTML_TEMPLATE = """
         }
 
         .copy-btn:hover {
-            background: #0a0a0a;
-            color: #ffffff;
+            background: rgba(205, 92, 92, 0.1);
+            border-color: #cd5c5c;
         }
 
         .info-box {
-            background: #1a1a1a;
+            background: rgba(20, 20, 20, 0.3);
             padding: 20px;
-            border: 1px solid #2a2a2a;
+            border: 1px solid rgba(205, 92, 92, 0.15);
             margin-top: 20px;
         }
 
         .info-box h3 {
-            color: #ffffff;
+            color: #f5f5f5;
             margin-bottom: 15px;
             font-size: 1.1em;
             font-weight: 300;
@@ -240,8 +277,8 @@ HTML_TEMPLATE = """
 
         .info-box li {
             padding: 10px 0;
-            color: #999;
-            border-bottom: 1px solid #2a2a2a;
+            color: #b8b8b8;
+            border-bottom: 1px solid rgba(205, 92, 92, 0.1);
         }
 
         .info-box li:last-child {
@@ -249,33 +286,34 @@ HTML_TEMPLATE = """
         }
 
         .info-box strong {
-            color: #ffffff;
+            color: #cd5c5c;
         }
 
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: #666;
+            color: #888;
         }
 
         .footer {
             text-align: center;
             padding: 40px;
-            color: #666;
+            color: #888;
             font-size: 0.9em;
             margin-top: 60px;
-            border-top: 1px solid #2a2a2a;
+            border-top: 1px solid rgba(205, 92, 92, 0.15);
         }
 
         .footer a {
-            color: #999;
+            color: #cd5c5c;
             text-decoration: none;
-            border-bottom: 1px solid #2a2a2a;
+            border-bottom: 1px solid rgba(205, 92, 92, 0.3);
+            transition: all 0.2s;
         }
 
         .footer a:hover {
-            color: #ffffff;
-            border-bottom: 1px solid #ffffff;
+            color: #b84e4e;
+            border-bottom: 1px solid #cd5c5c;
         }
     </style>
 </head>
