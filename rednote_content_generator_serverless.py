@@ -11,7 +11,8 @@ import requests
 class RedNoteContentGenerator:
     def __init__(self, api_key=None):
         """初始化小红书内容生成器 - Serverless版本"""
-        self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
+        # Try API key from: parameter > env var > fallback
+        self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY") or "sk-d315bdda3a5e4c86b80da8c92c675bc8"
         if not self.api_key:
             raise ValueError("请设置DEEPSEEK_API_KEY环境变量")
 

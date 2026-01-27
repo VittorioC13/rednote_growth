@@ -404,11 +404,8 @@ def index():
 def generate():
     """Generate new content - serverless compatible"""
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
-        if not api_key:
-            return jsonify({'success': False, 'error': 'API key not configured. Set DEEPSEEK_API_KEY environment variable.'})
-
-        generator = RedNoteContentGenerator(api_key)
+        # API key will use fallback if not set
+        generator = RedNoteContentGenerator()
         posts = generator.generate_posts()
 
         # Store in memory (will be lost on restart, but that's ok for serverless)
