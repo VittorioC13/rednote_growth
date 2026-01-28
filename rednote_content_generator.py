@@ -18,13 +18,69 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# ─── Persona definitions for multi-account system ───────────────────────────
+PERSONAS = {
+    "young_investor": {
+        "name": "年轻暴富",
+        "description": "18-21岁年轻投资者，成功故事为主，语气自信积极",
+        "voice": "当前角色身份：你是一个18-21岁的年轻美股投资者。强调年轻身份（如'才19岁''刚毕业'）。语气自信但谦逊，偶尔小得意。emoji使用较多（🚀📈💰😂）。用词年轻化，偶尔用网络梗但不失专业。"
+    },
+    "strategy_master": {
+        "name": "策略大师",
+        "description": "策略分析师，教育性内容，专业术语丰富",
+        "voice": "当前角色身份：你是一个经验丰富的美股策略分析师和教育者。语气冷静理性有条理，带有指导感。专业术语多但会简洁解释。结构化呈现（编号列表、分步骤）。emoji使用适中（📊📉🎯👉）。"
+    },
+    "transparent_trader": {
+        "name": "透明实盘",
+        "description": "实盘记录者，诚实分享盈亏，社区感强",
+        "voice": "当前角色身份：你是一个透明诚实的美股实盘记录者。语气真诚坦然，对亏损不避讳，对赚钱不炫耀。数据说话，用词平实。emoji仅用于标记要点（📊❤️🎯💰）。"
+    },
+    "trend_hunter": {
+        "name": "发现达人",
+        "description": "热点猎人，短小精悍，制造FOMO感",
+        "voice": "当前角色身份：你是一个美股热点猎人，擅长第一时间发现机会。语气兴奋急切有紧迫感。短句为主冲击力强，信息密度高。制造FOMO感但不过度夸大。emoji较多，选用制造热度的emoji（🔥⚡👀💎🚀）。"
+    },
+    "philosopher": {
+        "name": "哲学投资者",
+        "description": "投资哲学家，人生感悟，长期智慧",
+        "voice": "当前角色身份：你是一个通过美股投资领悟到人生智慧的哲学家式投资者。语气平静深邃不急不躁。偶尔用比喻和故事引人深思。语言优美但不臭屁。emoji使用极少。"
+    }
+}
+
+ACCOUNTS_FILE = Path("accounts.json")
+DEFAULT_ACCOUNTS = {
+    "A": {"persona": "young_investor"},
+    "B": {"persona": "strategy_master"},
+    "C": {"persona": "transparent_trader"},
+    "D": {"persona": "trend_hunter"},
+    "E": {"persona": "philosopher"}
+}
+
+def load_accounts():
+    """Load account configurations from JSON file"""
+    if ACCOUNTS_FILE.exists():
+        with open(ACCOUNTS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return DEFAULT_ACCOUNTS.copy()
+
+def save_accounts(accounts):
+    """Save account configurations to JSON file"""
+    with open(ACCOUNTS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(accounts, f, ensure_ascii=False, indent=2)
+
+
 class RedNoteContentGenerator:
-    def __init__(self, api_key=None):
+    def __init__(self, api_key=None, persona_id="young_investor", account_id="A"):
         """初始化小红书内容生成器"""
         # 设置DeepSeek API密钥
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
         if not self.api_key:
             raise ValueError("请设置DEEPSEEK_API_KEY环境变量或传入api_key参数")
+
+        # 设置账户和人设
+        self.account_id = account_id
+        self.persona_id = persona_id
+        self.persona = PERSONAS.get(persona_id, PERSONAS["young_investor"])
 
         # 创建Growth文件夹
         self.growth_folder = Path("Growth")
@@ -268,7 +324,10 @@ Emoji使用：
 - 专业术语用英文(covered call, margin, beta, day trade)
 - 叙述用中文
 
-请模仿这些爆款案例的风格创作新内容。只输出帖子内容本身，不要有其他说明。"""
+请模仿这些爆款案例的风格创作新内容。"""
+
+            # Inject persona-specific voice for this account
+            system_prompt += f"\n\n{self.persona['voice']}\n\n只输出帖子内容本身，不要有其他说明。"
 
             data = {
                 "model": "deepseek-chat",
@@ -504,14 +563,14 @@ GENIUS Act那一波，重仓了 Coinbase。
         """创建PDF文件"""
         # 生成文件名
         date_str = datetime.now().strftime("%Y%m%d")
-        filename = self.growth_folder / f"RedNote_Content_{date_str}.pdf"
+        filename = self.growth_folder / f"Account{self.account_id}_RedNote_Content_{date_str}.pdf"
 
         # 创建PDF文档
         doc = SimpleDocTemplate(str(filename), pagesize=letter)
         story = []
 
         # 添加标题
-        title = f"RedNote Daily Content - {datetime.now().strftime('%B %d, %Y')}"
+        title = f"Account {self.account_id} ({self.persona['name']}) - {datetime.now().strftime('%B %d, %Y')}"
         story.append(Paragraph(title, self.styles['Header']))
         story.append(Paragraph(f"Generated at: {datetime.now().strftime('%H:%M:%S')}", self.styles['TimeStamp']))
 
@@ -535,10 +594,11 @@ GENIUS Act那一波，重仓了 Coinbase。
     def save_as_text(self, posts):
         """同时保存为文本文件（备用）"""
         date_str = datetime.now().strftime("%Y%m%d")
-        filename = self.growth_folder / f"RedNote_Content_{date_str}.txt"
+        filename = self.growth_folder / f"Account{self.account_id}_RedNote_Content_{date_str}.txt"
 
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(f"小红书每日内容 / RedNote Daily Content\n")
+            f.write(f"账户 Account: {self.account_id} | 人设 Persona: {self.persona['name']}\n")
             f.write(f"日期 Date: {datetime.now().strftime('%Y-%m-%d')}\n")
             f.write(f"时间 Time: {datetime.now().strftime('%H:%M:%S')}\n")
             f.write("=" * 60 + "\n\n")
