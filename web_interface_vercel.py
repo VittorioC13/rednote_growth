@@ -1,22 +1,23 @@
 """
-Web interface for RedNote Content Generator - VERCEL SERVERLESS
-Clean RedNote theme design
+Multi-account web interface for RedNote Content Generator - VERCEL SERVERLESS
+Supports 5 independent accounts with persona-based content generation
 No file I/O - works in read-only serverless environment
 """
 from flask import Flask, render_template_string, jsonify, request
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from rednote_content_generator_serverless import RedNoteContentGenerator
+from rednote_content_generator_serverless import RedNoteContentGenerator, PERSONAS, DEFAULT_ACCOUNTS
+import copy
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# In-memory storage for generated posts (lost on restart, but that's ok for serverless)
-posts_cache = []
+# In-memory storage (lost on restart, that's ok for serverless)
+accounts_store = copy.deepcopy(DEFAULT_ACCOUNTS)
+posts_cache = {}  # keyed by account_id
 
-# HTML Template - RedNote Theme Design
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -25,437 +26,473 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小红书 Content Generator</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d1f1f 50%, #3d2626 100%);
-            color: #e8e8e8;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif;
+            background: linear-gradient(135deg, #FF2442 0%, #FF6B6B 50%, #FFA07A 100%);
             min-height: 100vh;
-            padding: 40px 20px;
-            line-height: 1.6;
-            position: relative;
+            padding: 24px;
         }
 
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image:
-                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.05) 2px, rgba(0,0,0,.05) 4px),
-                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,.05) 2px, rgba(0,0,0,.05) 4px);
-            pointer-events: none;
-            opacity: 0.3;
-        }
+        .container { max-width: 960px; margin: 0 auto; }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
+        /* Header */
         .header {
+            background: white;
+            padding: 26px 30px;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            margin-bottom: 22px;
             text-align: center;
-            margin-bottom: 60px;
-            padding: 40px;
-            border-bottom: 1px solid rgba(205, 92, 92, 0.2);
-            position: relative;
         }
-
-        .header h1 {
-            font-size: 3em;
-            font-weight: 300;
-            letter-spacing: -1px;
-            margin-bottom: 10px;
-            color: #f5f5f5;
-        }
-
-        .header p {
-            color: #b8b8b8;
-            font-size: 1.1em;
-            font-weight: 300;
-        }
-
+        .header h1 { color: #FF2442; font-size: 1.9em; margin-bottom: 5px; }
+        .header p { color: #888; font-size: 0.92em; }
         .status-badge {
             display: inline-block;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-size: 0.9em;
-            font-weight: 300;
-            margin-top: 15px;
-            background: rgba(205, 92, 92, 0.1);
-            color: #cd5c5c;
-            border: 1px solid rgba(205, 92, 92, 0.3);
+            padding: 5px 14px;
+            border-radius: 16px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-top: 10px;
+            background: #52C41A;
+            color: white;
         }
 
-        .main-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 30px;
-            margin-bottom: 40px;
+        /* Account Tabs */
+        .account-tabs {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 22px;
+        }
+        .tab {
+            width: 52px; height: 52px;
+            border-radius: 50%;
+            border: 2.5px solid #ddd;
+            background: white;
+            color: #999;
+            font-size: 1.1em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .tab:hover { border-color: #FF2442; color: #FF2442; transform: translateY(-2px); }
+        .tab.active {
+            background: linear-gradient(135deg, #FF2442, #FF6B6B);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 4px 16px rgba(255, 36, 66, 0.35);
+            transform: translateY(-2px);
         }
 
-        @media (max-width: 768px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
+        /* Account Panel */
+        .account-panel {
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            padding: 26px;
+            margin-bottom: 22px;
         }
-
-        .card {
-            background: rgba(20, 20, 20, 0.6);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(205, 92, 92, 0.15);
-            padding: 40px;
-            transition: all 0.3s;
-            position: relative;
-        }
-
-        .card:hover {
-            border-color: rgba(205, 92, 92, 0.3);
-            box-shadow: 0 10px 40px rgba(205, 92, 92, 0.05);
-        }
-
-        .card h2 {
-            font-size: 1.5em;
-            font-weight: 300;
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin-bottom: 20px;
-            color: #f5f5f5;
+        }
+        .panel-header h2 { color: #222; font-size: 1.35em; }
+        .persona-badge {
+            display: inline-block;
+            padding: 5px 14px;
+            background: linear-gradient(135deg, #FF2442, #FF6B6B);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
         }
 
+        /* Persona Selector */
+        .persona-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .persona-row label { color: #555; font-size: 0.88em; font-weight: 600; white-space: nowrap; }
+        .persona-row select {
+            flex: 1;
+            padding: 9px 34px 9px 12px;
+            border: 1.5px solid #e8e8e8;
+            border-radius: 10px;
+            font-size: 0.88em;
+            color: #333;
+            background: white;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+        .persona-row select:focus { border-color: #FF2442; }
+        .save-persona-btn {
+            display: none;
+            padding: 7px 16px;
+            background: #52C41A;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.82em;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .save-persona-btn:hover { background: #49AA16; }
+        .persona-desc { color: #999; font-size: 0.83em; margin-bottom: 20px; margin-left: 50px; }
+
+        /* Generate */
         .generate-btn {
             width: 100%;
-            padding: 20px;
-            background: linear-gradient(135deg, #cd5c5c 0%, #b84e4e 100%);
-            color: #ffffff;
-            border: 1px solid rgba(205, 92, 92, 0.5);
-            font-size: 1.2em;
-            font-weight: 400;
+            padding: 14px;
+            background: linear-gradient(135deg, #FF2442, #FF6B6B);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.08em;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 20px;
-            position: relative;
-            overflow: hidden;
+            transition: all 0.25s;
+            margin-bottom: 14px;
         }
+        .generate-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,36,66,0.4); }
+        .generate-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
 
-        .generate-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-            transition: left 0.5s;
-        }
-
-        .generate-btn:hover::before {
-            left: 100%;
-        }
-
-        .generate-btn:hover {
-            background: linear-gradient(135deg, #b84e4e 0%, #a34343 100%);
-            box-shadow: 0 5px 20px rgba(205, 92, 92, 0.3);
-        }
-
-        .generate-btn:disabled {
-            background: rgba(40, 40, 40, 0.5);
-            color: #666;
-            border: 1px solid rgba(60, 60, 60, 0.5);
-            cursor: not-allowed;
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 30px;
-            color: #666;
-        }
-
-        .loading.active {
-            display: block;
-        }
-
+        /* Loading */
+        .loading { display: none; text-align: center; padding: 22px 0; }
+        .loading.active { display: block; }
         .spinner {
-            border: 4px solid rgba(40, 40, 40, 0.3);
-            border-top: 4px solid #cd5c5c;
+            border: 3px solid #f0f0f0;
+            border-top: 3px solid #FF2442;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
+            width: 34px; height: 34px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 10px;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading p { color: #888; font-size: 0.88em; }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
+        /* Success */
         .success-message {
             display: none;
-            padding: 20px;
-            background: rgba(205, 92, 92, 0.1);
-            color: #cd5c5c;
-            border: 1px solid rgba(205, 92, 92, 0.3);
-            margin-bottom: 20px;
-            font-weight: 300;
-            text-align: center;
+            padding: 11px 16px;
+            background: #F0FFF4;
+            color: #52C41A;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            font-size: 0.88em;
         }
+        .success-message.active { display: block; }
 
-        .success-message.active {
-            display: block;
+        /* Posts Grid */
+        .posts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+        @media (max-width: 700px) { .posts-grid { grid-template-columns: 1fr; } }
+
+        .post-card {
+            background: #FAFAFA;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            padding: 16px 14px 12px 42px;
+            position: relative;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-
-        .post-item {
-            padding: 25px;
-            border: 1px solid rgba(205, 92, 92, 0.15);
-            margin-bottom: 20px;
-            background: rgba(20, 20, 20, 0.4);
-            backdrop-filter: blur(5px);
-            transition: all 0.2s;
+        .post-card:hover { border-color: #FF2442; box-shadow: 0 3px 10px rgba(255,36,66,0.1); }
+        .post-num {
+            position: absolute;
+            top: 13px; left: 13px;
+            width: 23px; height: 23px;
+            background: #FF2442;
+            color: white;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.72em;
+            font-weight: 700;
         }
-
-        .post-item:hover {
-            border-color: rgba(205, 92, 92, 0.3);
-            background: rgba(20, 20, 20, 0.6);
-        }
-
-        .post-number {
-            color: #ffffff;
-            font-weight: 300;
-            font-size: 1.2em;
-            margin-bottom: 15px;
-        }
-
         .post-content {
-            color: #e8e8e8;
-            line-height: 1.8;
+            color: #444;
+            line-height: 1.5;
+            font-size: 0.86em;
             white-space: pre-wrap;
-            margin-bottom: 15px;
-            font-size: 1.05em;
+            max-height: 180px;
+            overflow: hidden;
+            -webkit-mask-image: linear-gradient(to bottom, black 65%, transparent);
+            mask-image: linear-gradient(to bottom, black 65%, transparent);
         }
-
-        .copy-btn {
-            background: transparent;
-            color: #cd5c5c;
-            border: 1px solid rgba(205, 92, 92, 0.5);
-            padding: 10px 20px;
+        .post-card.expanded .post-content { max-height: none; -webkit-mask-image: none; mask-image: none; }
+        .post-actions { display: flex; gap: 6px; margin-top: 9px; }
+        .copy-btn, .expand-btn {
+            padding: 4px 11px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
             cursor: pointer;
-            font-weight: 400;
-            font-size: 0.95em;
+            font-size: 0.78em;
+            color: #666;
+            background: white;
             transition: all 0.2s;
         }
+        .copy-btn:hover { background: #FF2442; color: white; border-color: #FF2442; }
+        .expand-btn:hover { background: #f0f0f0; }
+        .copy-btn.copied { background: #52C41A; color: white; border-color: #52C41A; }
 
-        .copy-btn:hover {
-            background: rgba(205, 92, 92, 0.1);
-            border-color: #cd5c5c;
-        }
-
-        .info-box {
-            background: rgba(20, 20, 20, 0.3);
-            padding: 20px;
-            border: 1px solid rgba(205, 92, 92, 0.15);
-            margin-top: 20px;
-        }
-
-        .info-box h3 {
-            color: #f5f5f5;
-            margin-bottom: 15px;
-            font-size: 1.1em;
-            font-weight: 300;
-        }
-
-        .info-box ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        .info-box li {
-            padding: 10px 0;
-            color: #b8b8b8;
-            border-bottom: 1px solid rgba(205, 92, 92, 0.1);
-        }
-
-        .info-box li:last-child {
-            border-bottom: none;
-        }
-
-        .info-box strong {
-            color: #cd5c5c;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #888;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 40px;
-            color: #888;
-            font-size: 0.9em;
-            margin-top: 60px;
-            border-top: 1px solid rgba(205, 92, 92, 0.15);
-        }
-
-        .footer a {
-            color: #cd5c5c;
-            text-decoration: none;
-            border-bottom: 1px solid rgba(205, 92, 92, 0.3);
-            transition: all 0.2s;
-        }
-
-        .footer a:hover {
-            color: #b84e4e;
-            border-bottom: 1px solid #cd5c5c;
-        }
+        .empty-state { text-align: center; color: #aaa; padding: 28px 16px; font-size: 0.88em; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>小红书 Content Generator</h1>
-            <p>AI-Powered Viral US Stock Trading Content for RedNote</p>
-            <div class="status-badge">Online & Ready</div>
-        </div>
-
-        <div class="main-grid">
-            <div class="card">
-                <h2>Generate Content</h2>
-                <div class="success-message" id="successMessage">
-                    10 viral posts generated successfully
-                </div>
-                <button class="generate-btn" id="generateBtn" onclick="generateContent()">
-                    Generate 10 Viral Posts
-                </button>
-                <div class="loading" id="loading">
-                    <div class="spinner"></div>
-                    <p>Generating viral content...</p>
-                    <p style="font-size: 0.9em; margin-top: 10px;">This takes about 15-20 seconds</p>
-                </div>
-
-                <div class="info-box">
-                    <h3>What Gets Generated</h3>
-                    <ul>
-                        <li><strong>10 Unique Posts</strong> Ready for RedNote</li>
-                        <li><strong>Viral Formats</strong> Based on 600-3750 likes</li>
-                        <li><strong>US Stock Focus</strong> Trading, strategies, success</li>
-                        <li><strong>Copy & Paste</strong> Direct to platform</li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>Generated Posts</h2>
-                <div id="postsContainer">
-                    <div class="empty-state">
-                        <p>No posts yet. Click the button to generate.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p>Powered by DeepSeek AI | Built with Flask</p>
-            <p><a href="https://github.com/VittorioC13/rednote_growth" target="_blank">View on GitHub</a></p>
-        </div>
+<div class="container">
+    <div class="header">
+        <h1>📕 小红书 Content Generator</h1>
+        <p>5-Account Multi-Persona System</p>
+        <div class="status-badge" id="statusBadge">● Ready</div>
     </div>
 
-    <script>
-        function generateContent() {
-            const btn = document.getElementById('generateBtn');
-            const loading = document.getElementById('loading');
-            const successMsg = document.getElementById('successMessage');
-            const container = document.getElementById('postsContainer');
+    <div class="account-tabs" id="accountTabs">
+        <button class="tab active" data-account="A" onclick="selectAccount('A')">A</button>
+        <button class="tab" data-account="B" onclick="selectAccount('B')">B</button>
+        <button class="tab" data-account="C" onclick="selectAccount('C')">C</button>
+        <button class="tab" data-account="D" onclick="selectAccount('D')">D</button>
+        <button class="tab" data-account="E" onclick="selectAccount('E')">E</button>
+    </div>
 
-            btn.disabled = true;
-            loading.classList.add('active');
-            successMsg.classList.remove('active');
+    <div class="account-panel" id="accountPanel">
+        <div class="panel-header">
+            <h2 id="accountTitle">Account A</h2>
+            <span class="persona-badge" id="personaBadge">年轻暴富</span>
+        </div>
+        <div class="persona-row">
+            <label>人设:</label>
+            <select id="personaSelect" onchange="onPersonaChange()"></select>
+            <button class="save-persona-btn" id="savePersonaBtn" onclick="savePersona()">Save</button>
+        </div>
+        <p class="persona-desc" id="personaDesc">Loading...</p>
 
-            fetch('/generate', {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                btn.disabled = false;
-                loading.classList.remove('active');
+        <button class="generate-btn" id="generateBtn" onclick="generateContent()">
+            🚀 Generate Posts for Account A
+        </button>
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Generating posts...</p>
+        </div>
+        <div class="success-message" id="successMessage">✓ Posts generated successfully!</div>
+        <div class="posts-grid" id="postsGrid"></div>
+    </div>
+</div>
 
-                if (data.success) {
-                    successMsg.classList.add('active');
-                    displayPosts(data.posts);
-                    setTimeout(() => successMsg.classList.remove('active'), 5000);
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to generate content'));
-                }
-            })
-            .catch(error => {
-                btn.disabled = false;
-                loading.classList.remove('active');
-                alert('Error: ' + error.message);
-            });
+<script>
+let currentAccount = 'A';
+let accounts = {};
+let personas = {};
+let originalPersona = '';
+let currentPosts = [];
+
+// Init
+fetch('/accounts').then(r => r.json()).then(data => {
+    accounts = data.accounts;
+    personas = data.personas;
+    populatePersonaSelect();
+    updatePanel();
+});
+
+function populatePersonaSelect() {
+    const sel = document.getElementById('personaSelect');
+    sel.innerHTML = '';
+    Object.entries(personas).forEach(([id, p]) => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = p.name + ' — ' + p.description;
+        sel.appendChild(opt);
+    });
+}
+
+function selectAccount(id) {
+    currentAccount = id;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelector('[data-account="' + id + '"]').classList.add('active');
+    updatePanel();
+    document.getElementById('postsGrid').innerHTML = '';
+    document.getElementById('successMessage').classList.remove('active');
+    currentPosts = [];
+}
+
+function updatePanel() {
+    const acc = accounts[currentAccount];
+    const persona = personas[acc.persona];
+    originalPersona = acc.persona;
+    document.getElementById('accountTitle').textContent = 'Account ' + currentAccount;
+    document.getElementById('personaBadge').textContent = persona.name;
+    document.getElementById('personaSelect').value = acc.persona;
+    document.getElementById('personaDesc').textContent = persona.description;
+    document.getElementById('generateBtn').textContent = '🚀 Generate Posts for Account ' + currentAccount;
+    document.getElementById('savePersonaBtn').style.display = 'none';
+}
+
+function onPersonaChange() {
+    const sel = document.getElementById('personaSelect');
+    const saveBtn = document.getElementById('savePersonaBtn');
+    const desc = document.getElementById('personaDesc');
+    const badge = document.getElementById('personaBadge');
+    const p = personas[sel.value];
+    desc.textContent = p.description;
+    badge.textContent = p.name;
+    saveBtn.style.display = (sel.value !== originalPersona) ? 'inline-block' : 'none';
+}
+
+function savePersona() {
+    const sel = document.getElementById('personaSelect');
+    accounts[currentAccount].persona = sel.value;
+    originalPersona = sel.value;
+    fetch('/accounts/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({account_id: currentAccount, persona: sel.value})
+    }).then(r => r.json()).then(data => {
+        document.getElementById('savePersonaBtn').style.display = 'none';
+        if (!data.success) alert('Failed to save persona');
+    });
+}
+
+function generateContent() {
+    const btn = document.getElementById('generateBtn');
+    const loading = document.getElementById('loading');
+    const successMsg = document.getElementById('successMessage');
+    const postsGrid = document.getElementById('postsGrid');
+
+    btn.disabled = true;
+    loading.classList.add('active');
+    successMsg.classList.remove('active');
+    postsGrid.innerHTML = '';
+
+    fetch('/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({account_id: currentAccount})
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        loading.classList.remove('active');
+        if (data.success) {
+            successMsg.classList.add('active');
+            currentPosts = data.posts;
+            renderPosts(data.posts);
+            setTimeout(() => successMsg.classList.remove('active'), 4000);
+        } else {
+            alert('Error: ' + (data.error || 'Generation failed'));
         }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        loading.classList.remove('active');
+        alert('Network error: ' + err);
+    });
+}
 
-        function displayPosts(posts) {
-            const container = document.getElementById('postsContainer');
-            container.innerHTML = '';
+function renderPosts(posts) {
+    const grid = document.getElementById('postsGrid');
+    grid.innerHTML = '';
+    posts.forEach((post, i) => {
+        const card = document.createElement('div');
+        card.className = 'post-card';
+        card.innerHTML =
+            '<div class="post-num">' + post.number + '</div>' +
+            '<div class="post-content">' + escapeHtml(post.content) + '</div>' +
+            '<div class="post-actions">' +
+                '<button class="copy-btn" onclick="copyPost(' + i + ')">📋 Copy</button>' +
+                '<button class="expand-btn" onclick="toggleExpand(this)">Expand</button>' +
+            '</div>';
+        grid.appendChild(card);
+    });
+}
 
-            posts.forEach((post, index) => {
-                const postItem = document.createElement('div');
-                postItem.className = 'post-item';
-                postItem.innerHTML = `
-                    <div class="post-number">Post ${post.number}</div>
-                    <div class="post-content">${post.content}</div>
-                    <button class="copy-btn" onclick="copyToClipboard(\`${post.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
-                        Copy to Clipboard
-                    </button>
-                `;
-                container.appendChild(postItem);
-            });
-        }
+function copyPost(index) {
+    navigator.clipboard.writeText(currentPosts[index].content).then(() => {
+        const btns = document.querySelectorAll('.copy-btn');
+        btns[index].textContent = '✓ Copied';
+        btns[index].classList.add('copied');
+        setTimeout(() => { btns[index].textContent = '📋 Copy'; btns[index].classList.remove('copied'); }, 1500);
+    });
+}
 
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Copied to clipboard');
-            }).catch(err => {
-                alert('Failed to copy: ' + err);
-            });
-        }
-    </script>
+function toggleExpand(btn) {
+    const card = btn.closest('.post-card');
+    card.classList.toggle('expanded');
+    btn.textContent = card.classList.contains('expanded') ? 'Less' : 'Expand';
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
 </body>
 </html>
 """
+
 
 @app.route('/')
 def index():
     """Main page"""
     return render_template_string(HTML_TEMPLATE)
 
+
+@app.route('/accounts')
+def get_accounts():
+    """Return current account configs and persona definitions"""
+    return jsonify({
+        'accounts': accounts_store,
+        'personas': PERSONAS
+    })
+
+
+@app.route('/accounts/update', methods=['POST'])
+def update_account():
+    """Update a single account's persona"""
+    data = request.get_json()
+    account_id = data.get('account_id')
+    persona = data.get('persona')
+    if account_id in accounts_store and persona in PERSONAS:
+        accounts_store[account_id]['persona'] = persona
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Invalid account or persona'})
+
+
 @app.route('/generate', methods=['POST'])
 def generate():
-    """Generate new content - serverless compatible"""
+    """Generate content for a specific account using its persona"""
     try:
-        # API key will use fallback if not set
-        generator = RedNoteContentGenerator()
+        data = request.get_json() or {}
+        account_id = data.get('account_id', 'A')
+        persona_id = accounts_store.get(account_id, {}).get('persona', 'young_investor')
+
+        generator = RedNoteContentGenerator(persona_id=persona_id)
         posts = generator.generate_posts()
 
-        # Store in memory (will be lost on restart, but that's ok for serverless)
-        global posts_cache
-        posts_cache = posts
+        posts_cache[account_id] = posts
 
         return jsonify({'success': True, 'posts': posts})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+
 @app.route('/health')
 def health():
     """Health check endpoint"""
     return jsonify({'status': 'ok', 'service': 'rednote-generator'})
+
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
