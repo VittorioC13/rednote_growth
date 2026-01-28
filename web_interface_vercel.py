@@ -308,8 +308,7 @@ HTML_TEMPLATE = """
             margin-top: 20px;
             border-top: 1px solid rgba(205, 92, 92, 0.1);
         }
-        .footer a { color: #cd5c5c; text-decoration: none; border-bottom: 1px solid rgba(205, 92, 92, 0.3); transition: all 0.2s; }
-        .footer a:hover { border-bottom-color: #cd5c5c; }
+        /* no links in footer */
     </style>
 </head>
 <body>
@@ -353,7 +352,6 @@ HTML_TEMPLATE = """
 
     <div class="footer">
         <p>Powered by DeepSeek AI</p>
-        <p><a href="https://github.com/VittorioC13/rednote_growth" target="_blank">GitHub</a></p>
     </div>
 </div>
 
