@@ -342,7 +342,7 @@ Emoji使用：
                     }
                 ],
                 "temperature": 1.0,
-                "max_tokens": 500,
+                "max_tokens": 2000,  # Increased for higher quality single post
                 "stream": False
             }
 
@@ -366,56 +366,52 @@ Emoji使用：
             return None
 
     def generate_daily_posts(self):
-        """生成10条每日小红书内容"""
+        """生成1条高质量小红书内容 (改为单条高质量生成)"""
         print(f"\n{'='*60}")
         print(f"开始生成小红书内容 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Account: {self.account_id} | Persona: {self.persona['name']}")
         print(f"{'='*60}")
 
         posts = []
 
-        for i, prompt in enumerate(self.prompts, 1):
-            print(f"生成第 {i}/10 条内容...")
+        # 随机选择一个提示词类型来生成高质量内容
+        import random
+        selected_prompt = random.choice(self.prompts)
 
-            content = self.call_deepseek_api(prompt)
+        print(f"生成高质量内容 (1条)...")
 
-            if content:
-                # 小红书内容可以稍长一些
-                word_count = len(content)
-                max_chars = 800  # 字符限制
+        content = self.call_deepseek_api(selected_prompt)
 
-                if word_count > max_chars:
-                    content = content[:max_chars] + "..."
+        if content:
+            # 不限制字符长度，让内容完整输出
+            post_item = {
+                'number': 1,
+                'content': content,
+                'timestamp': datetime.now().strftime("%H:%M")
+            }
+            posts.append(post_item)
+            # Safe print with encoding handling
+            try:
+                print(f"  [OK] {content[:100]}...")
+            except UnicodeEncodeError:
+                print(f"  [OK] Content generated successfully")
+        else:
+            # 如果API失败，使用备用内容
+            backup_content = self.get_backup_content(1)
+            post_item = {
+                'number': 1,
+                'content': backup_content,
+                'timestamp': datetime.now().strftime("%H:%M"),
+                'backup': True
+            }
+            posts.append(post_item)
+            # Safe print with encoding handling
+            try:
+                print(f"  [BACKUP] 使用备用内容: {backup_content[:100]}...")
+            except UnicodeEncodeError:
+                print(f"  [BACKUP] Using backup content")
 
-                post_item = {
-                    'number': i,
-                    'content': content,
-                    'timestamp': datetime.now().strftime("%H:%M")
-                }
-                posts.append(post_item)
-                # Safe print with encoding handling
-                try:
-                    print(f"  [OK] {content[:50]}...")
-                except UnicodeEncodeError:
-                    print(f"  [OK] Content generated successfully (Post #{i})")
-            else:
-                # 如果API失败，使用备用内容
-                backup_content = self.get_backup_content(i)
-                post_item = {
-                    'number': i,
-                    'content': backup_content,
-                    'timestamp': datetime.now().strftime("%H:%M"),
-                    'backup': True
-                }
-                posts.append(post_item)
-                # Safe print with encoding handling
-                try:
-                    print(f"  [BACKUP] 使用备用内容: {backup_content[:50]}...")
-                except UnicodeEncodeError:
-                    print(f"  [BACKUP] Using backup content (Post #{i})")
-
-            time.sleep(1)  # 避免API速率限制
-
-        print(f"\n[OK] 成功生成 {len(posts)} 条内容")
+        print(f"\n[OK] 成功生成 {len(posts)} 条高质量内容")
         return posts
 
     def get_backup_content(self, index):

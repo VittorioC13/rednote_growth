@@ -290,7 +290,7 @@ HTML_TEMPLATE = """
 <div class="container">
     <div class="header">
         <h1>📕 小红书 Content Generator</h1>
-        <p>5-Account Multi-Persona System</p>
+        <p>5-Account Multi-Persona System | 1 High-Quality Post Per Click</p>
         <div class="status-badge" id="statusBadge">● Ready</div>
     </div>
 
@@ -315,13 +315,13 @@ HTML_TEMPLATE = """
         <p class="persona-desc" id="personaDesc">Loading...</p>
 
         <button class="generate-btn" id="generateBtn" onclick="generateContent()">
-            🚀 Generate Posts for Account A
+            🚀 Generate 1 High-Quality Post for Account A
         </button>
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>Generating posts...</p>
+            <p>Generating high-quality post...</p>
         </div>
-        <div class="success-message" id="successMessage">✓ Posts generated successfully!</div>
+        <div class="success-message" id="successMessage">✓ High-quality post generated successfully!</div>
         <div class="posts-grid" id="postsGrid"></div>
     </div>
 
@@ -390,7 +390,7 @@ function updatePanel() {
     document.getElementById('personaBadge').textContent = persona.name;
     document.getElementById('personaSelect').value = acc.persona;
     document.getElementById('personaDesc').textContent = persona.description;
-    document.getElementById('generateBtn').textContent = '🚀 Generate Posts for Account ' + currentAccount;
+    document.getElementById('generateBtn').textContent = '🚀 Generate 1 High-Quality Post for Account ' + currentAccount;
     document.getElementById('savePersonaBtn').style.display = 'none';
     document.getElementById('historyTitle').textContent = '📂 History — Account ' + currentAccount;
 }
