@@ -538,10 +538,10 @@ def generate():
     try:
         data = request.get_json() or {}
         account_id = data.get('account_id', 'A')
-        persona_id = accounts_store.get(account_id, {}).get('persona', 'young_investor')
+        persona_id = accounts_store.get(account_id, {}).get('persona', 'forex_gold_trader')
 
-        generator = RedNoteContentGenerator(persona_id=persona_id)
-        posts = generator.generate_posts()
+        generator = RedNoteContentGenerator(persona_id=persona_id, account_id=account_id)
+        posts = generator.generate_daily_posts()
 
         posts_cache[account_id] = posts
 
